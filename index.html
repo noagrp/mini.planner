@@ -88,9 +88,16 @@
         let currentTab = 'planner';
         let todos = JSON.parse(localStorage.getItem('myTodos')) || [];
 
+        function parseLocalTaskDate(dateStr, timeStr) {
+            // Helper function to process string pieces safely into local system time components
+            const dParts = dateStr.split('-');
+            const tParts = (timeStr || "00:00").split(':');
+            return new Date(dParts[0], dParts[1] - 1, dParts[2], tParts[0], tParts[1]);
+        }
+
         function updateSeason() {
             const dateVal = dateInput.value;
-            const m = dateVal ? new Date(dateVal).getMonth() : new Date().getMonth();
+            const m = dateVal ? new Date(dateVal.split('-')[0], dateVal.split('-')[1] - 1, dateVal.split('-')[2]).getMonth() : new Date().getMonth();
             if (m >= 2 && m <= 4) currentSeason = 'spring';
             else if (m >= 5 && m <= 7) currentSeason = 'summer';
             else if (m >= 8 && m <= 10) currentSeason = 'autumn';
@@ -156,11 +163,12 @@
         function render() {
             const list = document.getElementById('todoList');
             const now = new Date();
-            const sortedTodos = [...todos].sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+            const sortedTodos = [...todos].sort((a, b) => parseLocalTaskDate(a.date, a.time) - parseLocalTaskDate(b.date, b.time));
             
             let soundTriggered = false;
             const filtered = sortedTodos.filter(t => {
-                const taskDateTime = new Date(`${t.date}T${t.time}`);
+                // BUG FIX: Parsed parsing components into local scope values instead of UTC templates
+                const taskDateTime = parseLocalTaskDate(t.date, t.time);
                 const isDue = (taskDateTime <= now && taskDateTime >= new Date(now - 30000));
                 if (isDue && !t.playedSound && currentTab === 'planner') {
                     t.playedSound = true;
@@ -175,7 +183,7 @@
             }
 
             list.innerHTML = filtered.map(t => {
-                const taskDateTime = new Date(`${t.date}T${t.time}`);
+                const taskDateTime = parseLocalTaskDate(t.date, t.time);
                 const isDue = (taskDateTime <= now && taskDateTime >= new Date(now - 60000));
                 return `<div class="todo-card ${isDue ? 'due-now' : ''}">
                     <span><b>${t.date}</b> ${t.time}: ${t.text} <span class="category-tag">${t.category}</span></span>
@@ -184,11 +192,12 @@
             }).join('');
         }
 
+        // BUG FIX: Applied standard local reference checking when filtering task purges
         function deleteTask(id) { todos = todos.filter(t => t.id !== id); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); }
-        function purgeHistory() { todos = todos.filter(t => new Date(`${t.date}T${t.time}`) >= new Date()); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); }
+        function purgeHistory() { todos = todos.filter(t => parseLocalTaskDate(t.date, t.time) >= new Date()); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); }
 
         window.onload = () => { 
-            dateInput.value = new Date().toISOString().split('T')[0];
+            dateInput.value = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
             updateSeason();
             render(); 
         };
