@@ -121,7 +121,20 @@
             }
         }
         setInterval(createParticle, 600);
-        setInterval(render, 30000); // Auto-refresh for pulse effect
+        setInterval(render, 30000);
+
+        function playNotificationSound() {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
 
         function switchTab(tab) {
             currentTab = tab;
@@ -133,27 +146,11 @@
         }
 
         function addTask() {
-            const t = {id: Date.now(), date: dateInput.value, time: document.getElementById('timeInput').value, text: document.getElementById('taskInput').value, category: document.getElementById('categoryInput').value};
+            const t = {id: Date.now(), date: dateInput.value, time: document.getElementById('timeInput').value, text: document.getElementById('taskInput').value, category: document.getElementById('categoryInput').value, playedSound: false};
             if(!t.date || !t.text) return;
             todos.push(t);
             localStorage.setItem('myTodos', JSON.stringify(todos));
             render();
-        }
-
-function playNotificationSound() {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            oscillator.type = 'sine'; // Soft beep sound
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.5); // Beep for 0.5 seconds
         }
 
         function render() {
@@ -161,10 +158,21 @@ function playNotificationSound() {
             const now = new Date();
             const sortedTodos = [...todos].sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
             
+            let soundTriggered = false;
             const filtered = sortedTodos.filter(t => {
                 const taskDateTime = new Date(`${t.date}T${t.time}`);
+                const isDue = (taskDateTime <= now && taskDateTime >= new Date(now - 30000));
+                if (isDue && !t.playedSound && currentTab === 'planner') {
+                    t.playedSound = true;
+                    soundTriggered = true;
+                }
                 return currentTab === 'planner' ? (taskDateTime >= new Date(now.getTime() - 60000)) : (taskDateTime < now);
             });
+
+            if (soundTriggered) {
+                playNotificationSound();
+                localStorage.setItem('myTodos', JSON.stringify(todos));
+            }
 
             list.innerHTML = filtered.map(t => {
                 const taskDateTime = new Date(`${t.date}T${t.time}`);
