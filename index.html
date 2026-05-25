@@ -17,7 +17,7 @@
         .particle { position: absolute; border-radius: 50%; opacity: 0.6; }
         .shining-ball { background: radial-gradient(circle, #fff, #ffd700); box-shadow: 0 0 15px #ffeb3b; }
 
-        .ui-container { position: relative; z-index: 2; width: 90%; max-width: 400px; margin-top: 50px; background: var(--glass); backdrop-filter: blur(10px); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 32px rgba(0,0,0,0.1); color: #333;; margin-bottom: 50px; }
+        .ui-container { position: relative; z-index: 2; width: 90%; max-width: 400px; margin-top: 50px; background: rgba(255, 255, 255, 0.35); backdrop-filter: blur(15px); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 8px 32px rgba(0,0,0,0.2); color: #333; margin-bottom: 50px; }
         h2 { text-align: center; margin-top: 0; font-weight: 300; }
         
         input, button, select { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 10px; box-sizing: border-box; font-size: 16px; font-family: inherit; }
@@ -32,9 +32,16 @@
         .help-box { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; font-size: 12px; margin-bottom: 15px; }
         .disclaimer { font-size: 10px; opacity: 0.7; text-align: center; margin-top: 15px; }
         
-        .todo-card { background: rgba(0,0,0,0.15); padding: 12px; margin: 10px 0; border-radius: 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .todo-card { background: rgba(0,0,0,0.15); padding: 12px; margin: 10px 0; border-radius: 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; color: white; }
         .icon-btn { background: none; border: none; padding: 5px; width: auto; font-size: 16px; cursor: pointer; }
         .category-tag { padding: 2px 6px; border-radius: 5px; font-weight: bold; margin-left: 5px; font-size: 11px; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+            50% { transform: scale(1.02); box-shadow: 0 0 20px rgba(255, 255, 255, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+        }
+        .due-now { animation: pulse 2s infinite; background: rgba(255, 255, 255, 0.3) !important; border: 2px solid #fff; color: #000; }
     </style>
 </head>
 <body id="body" class="spring">
@@ -114,21 +121,7 @@
             }
         }
         setInterval(createParticle, 600);
-
-        function checkNotifications() {
-            const now = new Date();
-            todos.forEach(t => {
-                if (!t.notified && t.date && t.time) {
-                    const taskDateTime = new Date(`${t.date}T${t.time}`);
-                    if (taskDateTime <= now) {
-                        alert(`Reminder: ${t.text}`);
-                        t.notified = true;
-                        localStorage.setItem('myTodos', JSON.stringify(todos));
-                        render();
-                    }
-                }
-            });
-        }
+        setInterval(render, 30000); // Auto-refresh for pulse effect
 
         function switchTab(tab) {
             currentTab = tab;
@@ -140,7 +133,7 @@
         }
 
         function addTask() {
-            const t = {id: Date.now(), date: dateInput.value, time: document.getElementById('timeInput').value, text: document.getElementById('taskInput').value, category: document.getElementById('categoryInput').value, notified: false};
+            const t = {id: Date.now(), date: dateInput.value, time: document.getElementById('timeInput').value, text: document.getElementById('taskInput').value, category: document.getElementById('categoryInput').value};
             if(!t.date || !t.text) return;
             todos.push(t);
             localStorage.setItem('myTodos', JSON.stringify(todos));
@@ -150,11 +143,21 @@
         function render() {
             const list = document.getElementById('todoList');
             const now = new Date();
-            const filtered = todos.filter(t => {
+            const sortedTodos = [...todos].sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+            
+            const filtered = sortedTodos.filter(t => {
                 const taskDateTime = new Date(`${t.date}T${t.time}`);
-                return currentTab === 'planner' ? (taskDateTime >= now) : (taskDateTime < now);
+                return currentTab === 'planner' ? (taskDateTime >= new Date(now.getTime() - 60000)) : (taskDateTime < now);
             });
-            list.innerHTML = filtered.map(t => `<div class="todo-card"><span><b>${t.date}</b> ${t.time}: ${t.text} <span class="category-tag">${t.category}</span></span><button class="icon-btn" onclick="deleteTask(${t.id})">❌</button></div>`).join('');
+
+            list.innerHTML = filtered.map(t => {
+                const taskDateTime = new Date(`${t.date}T${t.time}`);
+                const isDue = (taskDateTime <= now && taskDateTime >= new Date(now - 60000));
+                return `<div class="todo-card ${isDue ? 'due-now' : ''}">
+                    <span><b>${t.date}</b> ${t.time}: ${t.text} <span class="category-tag">${t.category}</span></span>
+                    <button class="icon-btn" onclick="deleteTask(${t.id})">❌</button>
+                </div>`;
+            }).join('');
         }
 
         function deleteTask(id) { todos = todos.filter(t => t.id !== id); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); }
@@ -164,7 +167,6 @@
             dateInput.value = new Date().toISOString().split('T')[0];
             updateSeason();
             render(); 
-            setInterval(checkNotifications, 10000);
         };
 
         function exportData() {
