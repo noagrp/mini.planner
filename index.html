@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Planner</title>
+    <style>
+        :root { --glass: rgba(255, 255, 255, 0.25); }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background 1s ease; overflow-x: hidden; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; }
+        
+        .spring { background: linear-gradient(135deg, #a8e063, #56ab2f); }
+        .summer { background: linear-gradient(135deg, #f7d486, #f7971e); }
+        .autumn { background: linear-gradient(135deg, #ff9966, #ff5e62); }
+        .winter { background: linear-gradient(135deg, #83a4d4, #b6fbff); }
+
+        #effect-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        .particle { position: absolute; border-radius: 50%; opacity: 0.6; }
+        .shining-ball { background: radial-gradient(circle, #fff, #ffd700); box-shadow: 0 0 15px #ffeb3b; }
+
+        .ui-container { position: relative; z-index: 2; width: 90%; max-width: 400px; margin-top: 50px; background: var(--glass); backdrop-filter: blur(10px); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 8px 32px rgba(0,0,0,0.1); color: white; margin-bottom: 50px; }
+        h2 { text-align: center; margin-top: 0; font-weight: 300; }
+        
+        input, button, select { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 10px; box-sizing: border-box; font-size: 16px; font-family: inherit; }
+        button { background: rgba(255,255,255,0.3); color: white; cursor: pointer; transition: 0.3s; font-weight: bold; }
+        button:hover { background: rgba(255,255,255,0.5); }
+        select, input { background: rgba(255,255,255,0.8); color: #333; }
+        
+        .tab-nav { display: flex; gap: 5px; margin-bottom: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 5px; }
+        .tab-btn { margin: 0; background: transparent; color: rgba(255,255,255,0.6); transition: 0.3s; }
+        .tab-btn.active { background: rgba(255,255,255,0.9); color: #333; }
+        
+        .help-box { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; font-size: 12px; margin-bottom: 15px; }
+        .disclaimer { font-size: 10px; opacity: 0.7; text-align: center; margin-top: 15px; }
+        
+        .todo-card { background: rgba(0,0,0,0.15); padding: 12px; margin: 10px 0; border-radius: 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .icon-btn { background: none; border: none; padding: 5px; width: auto; font-size: 16px; cursor: pointer; }
+        .category-tag { padding: 2px 6px; border-radius: 5px; font-weight: bold; margin-left: 5px; font-size: 11px; }
+    </style>
+</head>
+<body id="body" class="spring">
+    <div id="effect-layer"></div>
+    <div class="ui-container">
+        <h2>Mini Planner</h2>
+        <div class="help-box">
+            <b>How to use:</b> 1. Set date and time, write short info. 2. Add to list. 
+            <i>3. Active Tab: Items awaiting attention. 4. History Tab: Past records.</i>
+        </div>
+
+        <div class="tab-nav">
+            <button class="tab-btn active" id="tabPlanner" onclick="switchTab('planner')">📅 Active</button>
+            <button class="tab-btn" id="tabHistory" onclick="switchTab('history')">🗄️ History</button>
+        </div>
+
+        <div id="inputSection">
+            <input type="date" id="dateInput" onchange="updateUI()">
+            <input type="time" id="timeInput">
+            <select id="categoryInput">
+                <option value="Personal">🟢 Personal</option>
+                <option value="Work">🔴 Work</option>
+                <option value="Fitness">🔵 Fitness</option>
+            </select>
+            <input type="text" id="taskInput" placeholder="Add a new task...">
+            <button onclick="addTask()">Add to List</button>
+        </div>
+        
+        <div id="todoList"></div>
+        <button id="purgeBtn" onclick="purgeHistory()" style="display:none; background: rgba(255,50,50,0.6);">🗑️ Clear History</button>
+        
+        <button onclick="exportData()">Backup / Export Records</button>
+        <button onclick="document.getElementById('fileInput').click()">Import / Load Records</button>
+        <input type="file" id="fileInput" onchange="importData(event)" style="display:none">
+
+        <div class="disclaimer">Disclaimer: This app uses local browser storage. Clearing browser data will delete records.</div>
+    </div>
+
+    <script>
+        const layer = document.getElementById('effect-layer');
+        const body = document.getElementById('body');
+        const dateInput = document.getElementById('dateInput');
+        let currentSeason = 'spring';
+        let currentTab = 'planner';
+        let todos = JSON.parse(localStorage.getItem('myTodos')) || [];
+
+        function updateUI() {
+            const dateVal = dateInput.value;
+            const m = dateVal ? new Date(dateVal).getMonth() : new Date().getMonth();
+            if (m >= 2 && m <= 4) currentSeason = 'spring';
+            else if (m >= 5 && m <= 7) currentSeason = 'summer';
+            else if (m >= 8 && m <= 10) currentSeason = 'autumn';
+            else currentSeason = 'winter';
+            body.className = currentSeason;
+            render();
+        }
+
+        function createParticle() {
+            const p = document.createElement('div');
+            const size = Math.random() * 10 + 5;
+            p.className = 'particle';
+            if(currentSeason === 'summer') {
+                p.classList.add('shining-ball');
+                p.style.bottom = '-20px';
+                p.style.left = Math.random() * 100 + 'vw';
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.transition = 'transform 4s linear, opacity 4s';
+                layer.appendChild(p);
+                setTimeout(() => { p.style.transform = `translateY(-100vh)`; p.style.opacity = '0'; setTimeout(() => p.remove(), 4000); }, 50);
+            } else {
+                p.innerText = currentSeason === 'spring' ? '🌸' : currentSeason === 'autumn' ? '🍂' : '❄️';
+                p.style.left = Math.random() * 100 + 'vw';
+                p.style.top = '-20px';
+                p.style.transition = 'transform 6s linear';
+                layer.appendChild(p);
+                setTimeout(() => { p.style.transform = `translateY(100vh)`; setTimeout(() => p.remove(), 6000); }, 50);
+            }
+        }
+        setInterval(createParticle, 600);
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabPlanner').className = tab === 'planner' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tabHistory').className = tab === 'history' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('inputSection').style.display = tab === 'planner' ? 'block' : 'none';
+            document.getElementById('purgeBtn').style.display = tab === 'history' ? 'block' : 'none';
+            render();
+        }
+
+        function addTask() {
+            const t = {id: Date.now(), date: dateInput.value, time: document.getElementById('timeInput').value, text: document.getElementById('taskInput').value, category: document.getElementById('categoryInput').value};
+            if(!t.date || !t.text) return;
+            todos.push(t);
+            localStorage.setItem('myTodos', JSON.stringify(todos));
+            render();
+        }
+
+        function render() {
+            const list = document.getElementById('todoList');
+            const todayStr = new Date().toISOString().split('T')[0];
+            const filtered = todos.filter(t => currentTab === 'planner' ? (t.date >= todayStr) : (t.date < todayStr));
+            list.innerHTML = filtered.map(t => `<div class="todo-card"><span><b>${t.date}</b> ${t.time}: ${t.text} <span class="category-tag">${t.category}</span></span><button class="icon-btn" onclick="deleteTask(${t.id})">❌</button></div>`).join('');
+            updateUI();
+        }
+
+        function deleteTask(id) { todos = todos.filter(t => t.id !== id); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); }
+        function purgeHistory() { const todayStr = new Date().toISOString().split('T')[0]; todos = todos.filter(t => t.date >= todayStr); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); }
+
+        window.onload = () => { 
+            dateInput.value = new Date().toISOString().split('T')[0];
+            render(); 
+        };
+
+        function exportData() {
+            const a = document.createElement('a');
+            a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(JSON.stringify(todos));
+            a.download = 'my_planner_backup.txt';
+            a.click();
+        }
+        function importData(e) {
+            const r = new FileReader();
+            r.onload = (ev) => { todos = JSON.parse(ev.target.result); localStorage.setItem('myTodos', JSON.stringify(todos)); render(); };
+            r.readAsText(e.target.files[0]);
+        }
+    </script>
+</body>
+</html>
